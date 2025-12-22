@@ -8,6 +8,9 @@ import { Dashboard } from './components/Dashboard';
 import { ProductsManager } from './components/ProductsManager';
 import { OrdersManager } from './components/OrdersManager';
 import { CustomersManager } from './components/CustomersManager';
+import { SellerApplications } from './components/admin/SellerApplications';
+import { AdminNotifications } from './components/admin/AdminNotifications';
+import { AdminProfile } from './components/admin/AdminProfile';
 import { SellerDashboard } from './components/SellerDashboard';
 import { SellerOrdersView } from './components/SellerOrdersView';
 import { SellerSidebar } from './components/SellerSidebar';
@@ -45,6 +48,7 @@ import { Button } from './components/ui/button';
 import { LogOut, ShoppingCart, Package, Home, MessageCircle, Bell, Star, User, ArrowLeft, Search, BarChart3, Wallet, RotateCcw } from 'lucide-react';
 import { Badge } from './components/ui/badge';
 import { Toaster } from './components/ui/sonner';
+import { mockUsers } from './data/mockData';
 
 interface Product {
   id: string;
@@ -153,6 +157,9 @@ function AppContent() {
 
   // Admin view
   if (user.role === 'admin') {
+    const pendingSellerCount = mockUsers.filter(u => u.role === 'seller' && u.status === 'pending').length;
+    const adminNotificationCount = 8; // Mock notification count
+    
     const renderView = () => {
       switch (currentView) {
         case 'dashboard':
@@ -163,6 +170,12 @@ function AppContent() {
           return <OrdersManager />;
         case 'customers':
           return <CustomersManager />;
+        case 'seller-applications':
+          return <SellerApplications />;
+        case 'notifications':
+          return <AdminNotifications onNavigate={setCurrentView} />;
+        case 'profile':
+          return <AdminProfile />;
         default:
           return <Dashboard />;
       }
@@ -171,7 +184,12 @@ function AppContent() {
     return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
-          <AppSidebar currentView={currentView} onNavigate={setCurrentView} />
+          <AppSidebar 
+            currentView={currentView} 
+            onNavigate={setCurrentView}
+            pendingCount={pendingSellerCount}
+            notificationCount={adminNotificationCount}
+          />
           <main className="flex-1 overflow-y-auto bg-gray-50">
             <div className="container mx-auto p-4 sm:p-6">
               <div className="flex justify-between items-center mb-6">

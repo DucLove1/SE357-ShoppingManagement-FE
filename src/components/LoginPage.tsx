@@ -97,7 +97,7 @@ export function LoginPage({ onSwitchToRegister }: LoginPageProps) {
             <p className="font-semibold">Tài khoản demo:</p>
             <div className="space-y-1 text-xs">
               <p>• Admin: admin@shop.com / admin123</p>
-              <p>• Seller: seller@shop.com / seller123</p>
+              <p>• Chủ cửa hàng: seller@shop.com / seller123</p>
               <p>• Customer: customer@shop.com / customer123</p>
             </div>
           </div>

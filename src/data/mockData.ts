@@ -3,10 +3,14 @@ import { User, Category, Product, Order, Coupon, ShippingPolicy, Review, Activit
 // Users
 export const mockUsers: User[] = [
   { id: '1', name: 'Quản trị viên', email: 'admin@shop.com', phone: '0901234567', role: 'admin', status: 'active', createdAt: '2025-01-01' },
-  { id: '2', name: 'Nhân viên bán hàng A', email: 'seller@shop.com', phone: '0912345678', role: 'seller', status: 'active', createdAt: '2025-02-01' },
-  { id: '3', name: 'Nhân viên bán hàng B', email: 'seller2@shop.com', phone: '0923456789', role: 'seller', status: 'active', createdAt: '2025-03-01' },
+  { id: '2', name: 'Nhân viên bán hàng A', email: 'seller@shop.com', phone: '0912345678', role: 'seller', status: 'active', createdAt: '2025-02-01', approvedAt: '2025-02-02', approvedBy: '1', businessName: 'Fashion Store A', businessAddress: '123 Nguyễn Huệ, Q1, TP.HCM', taxId: 'TAX001' },
+  { id: '3', name: 'Nhân viên bán hàng B', email: 'seller2@shop.com', phone: '0923456789', role: 'seller', status: 'active', createdAt: '2025-03-01', approvedAt: '2025-03-02', approvedBy: '1', businessName: 'Tech Shop B', businessAddress: '456 Lê Lợi, Q1, TP.HCM', taxId: 'TAX002' },
   { id: '4', name: 'Nguyễn Văn A', email: 'customer@shop.com', phone: '0934567890', role: 'customer', status: 'active', createdAt: '2025-04-01' },
   { id: '5', name: 'Trần Thị B', email: 'customer2@shop.com', phone: '0945678901', role: 'customer', status: 'active', createdAt: '2025-05-01' },
+  // Pending sellers
+  { id: '6', name: 'Lê Minh C', email: 'pendingseller1@shop.com', phone: '0956789012', role: 'seller', status: 'pending', createdAt: '2025-11-20', businessName: 'Beauty Shop C', businessAddress: '789 Trần Hưng Đạo, Q5, TP.HCM', businessLicense: 'GP-001234', taxId: 'TAX003' },
+  { id: '7', name: 'Phạm Thị D', email: 'pendingseller2@shop.com', phone: '0967890123', role: 'seller', status: 'pending', createdAt: '2025-11-21', businessName: 'Home Decor D', businessAddress: '321 Võ Văn Tần, Q3, TP.HCM', businessLicense: 'GP-005678', taxId: 'TAX004' },
+  { id: '8', name: 'Hoàng Văn E', email: 'pendingseller3@shop.com', phone: '0978901234', role: 'seller', status: 'pending', createdAt: '2025-11-22', businessName: 'Electronics Hub E', businessAddress: '555 Cách Mạng Tháng 8, Q10, TP.HCM', businessLicense: 'GP-009876', taxId: 'TAX005' },
 ];
 
 // Categories

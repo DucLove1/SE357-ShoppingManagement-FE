@@ -9,7 +9,17 @@ export interface User {
   role: UserRole;
   avatar?: string;
   createdAt: string;
-  status: 'active' | 'inactive' | 'banned';
+  status: 'active' | 'inactive' | 'banned' | 'pending';
+  // Additional fields for pending sellers
+  businessName?: string;
+  businessAddress?: string;
+  businessLicense?: string;
+  taxId?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
 }
 
 // Category
