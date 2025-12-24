@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
@@ -63,6 +64,10 @@ interface Product {
   reviewCount?: number;
   soldCount?: number;
   storeName?: string;
+  sellerId?: string;
+  sellerName?: string;
+  salePrice?: number;
+  originalPrice?: number;
 }
 
 const mockProducts: Product[] = [
@@ -80,15 +85,8 @@ function AppContent() {
   const { user, logout } = useAuth();
   const [currentView, setCurrentView] = useState('home');
   const [showRegister, setShowRegister] = useState(false);
-  const [cart, setCart] = useState<Record<string, number>>({
-    '1': 2,  // Áo thun nam cổ tròn x2
-    '2': 1,  // Quần jean nữ skinny x1
-    '4': 1,  // Túi xách nữ da PU x1
-    '5': 1,  // Áo khoác hoodie x1
-    '6': 2,  // Mũ lưỡi trai x2
-    '7': 1,  // Váy midi nữ x1
-    '8': 1,  // Kính mát thời trang x1
-  });
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [cartProducts, setCartProducts] = useState<Record<string, Product>>({});
   const [chatDetail, setChatDetail] = useState<{ conversationId: string; sellerName: string } | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showSearch, setShowSearch] = useState(false);
@@ -115,12 +113,78 @@ function AppContent() {
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [showReturns, setShowReturns] = useState(false);
   const [returnDetailId, setReturnDetailId] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState({
+  const [userProfile, setUserProfile] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    avatar?: string;
+  }>({
     name: user?.name || 'User',
     email: user?.email || 'customer@example.com',
     phone: '0901234567',
-    avatar: undefined as string | undefined,
+    avatar: undefined,
   });
+
+  useEffect(() => {
+    if (!user || user.role !== 'customer') return;
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.log('No access token found');
+      return;
+    }
+
+    const fetchCart = async () => {
+      try {
+        console.log('Fetching cart...');
+        const res = await axios.get('/api/cart/refresh', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        console.log('Cart response:', res.data);
+
+        const items = res.data?.data?.items || [];
+        const quantities: Record<string, number> = {};
+        const products: Record<string, Product> = {};
+
+        items.forEach((item: any) => {
+          const pid = item.product_id as string;
+          const snap = item.snapshot || {};
+          if (!pid) return;
+
+          quantities[pid] = item.quantity ?? 0;
+          products[pid] = {
+            id: pid,
+            name: snap.product_name || 'Sản phẩm',
+            category: '',
+            sellerId: item.seller_id || 'unknown',
+            sellerName: snap.seller_name || 'Cửa hàng',
+            storeName: snap.seller_name || 'Cửa hàng',
+            price: (snap.sale_price ?? snap.price ?? 0) as number,
+            salePrice: (snap.sale_price ?? snap.price ?? 0) as number,
+            originalPrice: (snap.price ?? snap.sale_price ?? 0) as number,
+            image: snap.image?.url || 'https://via.placeholder.com/100',
+            inStock: Boolean(snap.is_available ?? true),
+            stock: snap.stock ?? undefined,
+            reviewCount: 0,
+            soldCount: 0,
+            rating: 0,
+            description: '',
+          };
+        });
+
+        console.log('Setting cart with', Object.keys(quantities).length, 'items');
+        setCart(quantities);
+        setCartProducts(products);
+      } catch (err) {
+        console.error('Failed to load cart:', err);
+        // Don't let cart fetch error break the app - just use empty cart
+        setCart({});
+        setCartProducts({});
+      }
+    };
+
+    fetchCart();
+  }, [user]);
 
   if (!user) {
     if (showRegister) {
@@ -581,6 +645,7 @@ function AppContent() {
           return (
             <CustomerCart
               cart={cart}
+              products={cartProducts}
               updateQuantity={updateQuantity}
               clearCart={clearCart}
               onCheckout={() => setShowCheckout(true)}
@@ -651,6 +716,10 @@ function AppContent() {
               cart={cart}
               addToCart={addToCart}
               updateQuantity={updateQuantity}
+              onSelectProduct={(product) => {
+                setSelectedProduct(product);
+                setCurrentView('product-detail');
+              }}
             />
           );
       }

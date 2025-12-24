@@ -12,8 +12,10 @@ interface Product {
   name: string;
   price: number;
   image: string;
-  sellerId: string;
-  sellerName: string;
+  sellerId?: string;
+  sellerName?: string;
+  salePrice?: number;
+  originalPrice?: number;
 }
 
 const mockProducts: Record<string, Product> = {
@@ -28,6 +30,7 @@ const mockProducts: Record<string, Product> = {
 
 interface CartProps {
   cart: Record<string, number>;
+  products?: Record<string, Product>;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   onCheckout: () => void;
@@ -40,31 +43,34 @@ interface ShopGroup {
   items: Array<{ productId: string; product: Product; quantity: number }>;
 }
 
-export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBack }: CartProps) {
+export function CustomerCart({ cart, products, updateQuantity, clearCart, onCheckout, onBack }: CartProps) {
   const [selectedShops, setSelectedShops] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   const cartItems = Object.entries(cart).filter(([_, qty]) => qty > 0);
-  
+
   // Group items by seller
   const shopGroups: ShopGroup[] = [];
   const shopMap = new Map<string, ShopGroup>();
 
   cartItems.forEach(([productId, quantity]) => {
-    const product = mockProducts[productId];
+    const product = (products && products[productId]) || mockProducts[productId];
     if (!product) return;
 
-    if (!shopMap.has(product.sellerId)) {
+    const sellerId = product.sellerId || 'unknown';
+    const sellerName = product.sellerName || 'Cửa hàng';
+
+    if (!shopMap.has(sellerId)) {
       const group: ShopGroup = {
-        sellerId: product.sellerId,
-        sellerName: product.sellerName,
+        sellerId: sellerId,
+        sellerName: sellerName,
         items: [],
       };
-      shopMap.set(product.sellerId, group);
+      shopMap.set(sellerId, group);
       shopGroups.push(group);
     }
 
-    shopMap.get(product.sellerId)!.items.push({ productId, product, quantity });
+    shopMap.get(sellerId)!.items.push({ productId, product, quantity });
   });
 
   const toggleShopSelection = (sellerId: string, items: ShopGroup['items']) => {
@@ -90,7 +96,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
     if (selectedItems.has(productId)) {
       newSelectedItems.delete(productId);
       // Check if shop should be deselected
-      const anySelected = shopItems.some(item => 
+      const anySelected = shopItems.some(item =>
         item.productId !== productId && newSelectedItems.has(item.productId)
       );
       if (!anySelected) {
@@ -99,7 +105,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
     } else {
       newSelectedItems.add(productId);
       // Check if all items in shop are selected
-      const allSelected = shopItems.every(item => 
+      const allSelected = shopItems.every(item =>
         item.productId === productId || newSelectedItems.has(item.productId)
       );
       if (allSelected) {
@@ -112,7 +118,10 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
   };
 
   const calculateShopTotal = (items: ShopGroup['items']) => {
-    return items.reduce((sum, { product, quantity }) => sum + product.price * quantity, 0);
+    return items.reduce((sum, { product, quantity }) => {
+      const unitPrice = product.salePrice ?? product.price;
+      return sum + unitPrice * quantity;
+    }, 0);
   };
 
   const calculateSelectedTotal = () => {
@@ -120,7 +129,8 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
     shopGroups.forEach(shop => {
       shop.items.forEach(({ productId, product, quantity }) => {
         if (selectedItems.has(productId)) {
-          total += product.price * quantity;
+          const unitPrice = product.salePrice ?? product.price;
+          total += unitPrice * quantity;
         }
       });
     });
@@ -133,7 +143,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
     items.forEach(item => newSelectedItems.add(item.productId));
     setSelectedItems(newSelectedItems);
     setSelectedShops(new Set([sellerId]));
-    
+
     toast.success(`Đang thanh toán ${items.length} sản phẩm từ ${items[0].product.sellerName}`);
     onCheckout();
   };
@@ -154,9 +164,9 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
   return (
     <div className="space-y-4 sm:space-y-6 pb-32 sm:pb-6">
       <div className="flex items-center gap-3">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onBack || (() => window.history.back())}
           className="-ml-2"
         >
@@ -193,7 +203,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
             {shopGroups.map((shop) => {
               const shopTotal = calculateShopTotal(shop.items);
               const isShopSelected = selectedShops.has(shop.sellerId);
-              const selectedItemsCount = shop.items.filter(item => 
+              const selectedItemsCount = shop.items.filter(item =>
                 selectedItems.has(item.productId)
               ).length;
 
@@ -234,7 +244,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                           <span className="sm:hidden">Mua</span>
                         </Button>
                       </div>
-                      
+
                       {selectedItemsCount > 0 && selectedItemsCount < shop.items.length && (
                         <div className="flex items-center gap-2 pl-9">
                           <Badge variant="secondary" className="text-xs">
@@ -250,13 +260,12 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                     <div className="divide-y">
                       {shop.items.map(({ productId, product, quantity }) => {
                         const isSelected = selectedItems.has(productId);
-                        
+
                         return (
                           <div
                             key={productId}
-                            className={`p-3 sm:p-4 transition-colors ${
-                              isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'
-                            }`}
+                            className={`p-3 sm:p-4 transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'
+                              }`}
                           >
                             <div className="flex gap-3">
                               <Checkbox
@@ -264,17 +273,34 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                                 onCheckedChange={() => toggleItemSelection(productId, shop.sellerId, shop.items)}
                                 className="mt-1"
                               />
-                              
-                              <div className="text-3xl sm:text-4xl flex-shrink-0">{product.image}</div>
-                              
+
+                              <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0">
+                                <img
+                                  src={product.image}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover rounded-lg border border-gray-200"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = 'https://via.placeholder.com/100?text=No+Image';
+                                  }}
+                                />
+                              </div>
+
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-semibold text-sm sm:text-base mb-1 line-clamp-2">
                                   {product.name}
                                 </h4>
-                                <p className="text-sm text-gray-500 mb-2">
-                                  {product.price.toLocaleString('vi-VN')} ₫
-                                </p>
-                                
+                                <div className="flex items-center gap-2 mb-2">
+                                  <p className="text-sm font-semibold text-red-600">
+                                    {(product.salePrice ?? product.price).toLocaleString('vi-VN')} ₫
+                                  </p>
+                                  {product.originalPrice && product.originalPrice > (product.salePrice ?? product.price) && (
+                                    <p className="text-xs text-gray-500 line-through">
+                                      {product.originalPrice.toLocaleString('vi-VN')} ₫
+                                    </p>
+                                  )}
+                                </div>
+
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center gap-2 bg-white border rounded-lg">
                                     <Button
@@ -295,7 +321,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                                       <Plus className="h-3 w-3" />
                                     </Button>
                                   </div>
-                                  
+
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -309,7 +335,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
 
                               <div className="text-right flex-shrink-0">
                                 <p className="font-bold text-sm sm:text-base text-blue-600">
-                                  {(product.price * quantity).toLocaleString('vi-VN')} ₫
+                                  {((product.salePrice ?? product.price) * quantity).toLocaleString('vi-VN')} ₫
                                 </p>
                               </div>
                             </div>
@@ -352,7 +378,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                 </div>
 
                 <Separator />
-                
+
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tạm tính:</span>
@@ -363,9 +389,9 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                     <span className="font-medium">{selectedShipping.toLocaleString('vi-VN')} ₫</span>
                   </div>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Tổng cộng:</span>
                   <span className="text-xl font-bold text-blue-600">
@@ -374,8 +400,8 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                 </div>
               </CardContent>
               <CardFooter className="flex-col gap-2">
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   onClick={handleCheckoutSelected}
                   disabled={selectedItems.size === 0}
                 >
@@ -400,7 +426,7 @@ export function CustomerCart({ cart, updateQuantity, clearCart, onCheckout, onBa
                   {selectedTotal.toLocaleString('vi-VN')} ₫
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={handleCheckoutSelected}
                 disabled={selectedItems.size === 0}
                 size="lg"
