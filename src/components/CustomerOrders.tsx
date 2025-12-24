@@ -76,27 +76,33 @@ export function CustomerOrders({ onViewOrderDetail, onViewTracking, onViewReturn
         const res = await axios.get('/api/orders/my-orders', {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
-        const data = (res.data?.data as any[]) || [];
+        const data = res.data?.data?.orders || [];
         const normalized: Order[] = data.map((o: any) => {
-          const itemsSrc = Array.isArray(o.items) ? o.items : [];
-          const items = itemsSrc.map((it: any) => ({
+          // For now, create placeholder items since API doesn't return items in list view
+          const items = Array.isArray(o.items) ? o.items.map((it: any) => ({
             name: it.name || it.product_name || 'Sản phẩm',
             quantity: Number(it.quantity ?? 1),
             price: Number(it.price ?? it.unit_price ?? 0),
-            image: '📦',
-          }));
-          const total = Number(
-            o.total ?? o.total_amount ?? items.reduce((s: number, it: any) => s + it.price * it.quantity, 0)
-          );
+            image: it.image || '📦',
+          })) : [];
+
+          // Use item_count to show number of items if items array not available
+          const itemCount = o.item_count || items.length || 0;
+
           return {
-            id: String(o.id ?? o._id ?? crypto.randomUUID()),
-            orderNumber: o.order_number || o.orderNumber || `ORD-${String(o.id ?? '').slice(-6)}`,
-            date: o.created_at || o.createdAt || new Date().toISOString(),
-            total,
+            id: String(o.id),
+            orderNumber: o.order_number,
+            date: o.created_at,
+            total: Number(o.total),
             status: mapStatus(o.status),
-            sellerName: 'ShopeeShop',
-            trackingNumber: o.tracking_number || o.trackingNumber,
-            items,
+            sellerName: 'Người bán',
+            trackingNumber: o.tracking_number,
+            items: items.length > 0 ? items : [{
+              name: `${itemCount} sản phẩm`,
+              quantity: itemCount,
+              price: Number(o.total) / (itemCount || 1),
+              image: '📦',
+            }],
           } as Order;
         });
         if (active) setOrders(normalized);
