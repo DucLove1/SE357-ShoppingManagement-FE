@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -9,19 +9,29 @@ import { Alert, AlertDescription } from './ui/alert';
 
 interface LoginPageProps {
   onSwitchToRegister?: () => void;
+  onLoginSuccess?: (role: 'admin' | 'seller' | 'customer') => void;
 }
 
-export function LoginPage({ onSwitchToRegister }: LoginPageProps) {
+export function LoginPage({ onSwitchToRegister, onLoginSuccess }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, user } = useAuth();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect to role landing once user becomes available
+  useEffect(() => {
+    if (user && !hasRedirected) {
+      setHasRedirected(true);
+      onLoginSuccess?.(user.role);
+    }
+  }, [user, hasRedirected, onLoginSuccess]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    const success = login(email, password);
+
+    const success = await login(email, password);
     if (!success) {
       setError('Email hoặc mật khẩu không đúng');
     }
@@ -92,15 +102,6 @@ export function LoginPage({ onSwitchToRegister }: LoginPageProps) {
               </p>
             </div>
           )}
-
-          <div className="mt-6 space-y-2 text-sm text-gray-600">
-            <p className="font-semibold">Tài khoản demo:</p>
-            <div className="space-y-1 text-xs">
-              <p>• Admin: admin@shop.com / admin123</p>
-              <p>• Chủ cửa hàng: seller@shop.com / seller123</p>
-              <p>• Customer: customer@shop.com / customer123</p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

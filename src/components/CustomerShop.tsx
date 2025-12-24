@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Search, ShoppingCart, Plus, Minus, Store, Star } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import axios from 'axios';
+
+const DEFAULT_IMAGE = 'https://via.placeholder.com/400?text=No+Image';
 
 interface Product {
   id: string;
@@ -15,18 +18,8 @@ interface Product {
   inStock: boolean;
   storeName?: string;
   rating?: number;
+  stock?: number;
 }
-
-const mockProducts: Product[] = [
-  { id: '1', name: 'Áo thun nam cổ tròn', category: 'Thời trang', price: 199000, image: '👕', inStock: true, storeName: 'Fashion Store A', rating: 4.5 },
-  { id: '2', name: 'Quần jean nữ skinny', category: 'Thời trang', price: 450000, image: '👖', inStock: true, storeName: 'Denim Shop', rating: 4.8 },
-  { id: '3', name: 'Giày thể thao nam', category: 'Giày dép', price: 890000, image: '👟', inStock: false, storeName: 'Sport Shoes Pro', rating: 4.3 },
-  { id: '4', name: 'Túi xách nữ da PU', category: 'Phụ kiện', price: 320000, image: '👜', inStock: true, storeName: 'Bags & More', rating: 4.7 },
-  { id: '5', name: 'Áo khoác hoodie', category: 'Thời trang', price: 550000, image: '🧥', inStock: true, storeName: 'Fashion Store A', rating: 4.9 },
-  { id: '6', name: 'Mũ lưỡi trai', category: 'Phụ kiện', price: 120000, image: '🧢', inStock: true, storeName: 'Accessories Hub', rating: 4.2 },
-  { id: '7', name: 'Váy midi nữ', category: 'Thời trang', price: 380000, image: '👗', inStock: true, storeName: 'Fashion Store A', rating: 4.6 },
-  { id: '8', name: 'Kính mát thời trang', category: 'Phụ kiện', price: 250000, image: '🕶️', inStock: true, storeName: 'Accessories Hub', rating: 4.4 },
-];
 
 interface CartContextType {
   cart: Record<string, number>;
@@ -38,10 +31,75 @@ interface CartContextType {
 export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct }: CartContextType) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
 
-  const categories = ['all', ...Array.from(new Set(mockProducts.map(p => p.category)))];
+  const normalizeImageUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const base = (import.meta as any).env?.VITE_API_BASE_URL || '';
+    return `${base}${url}`;
+  };
 
-  const filteredProducts = mockProducts.filter((product) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchCategoryName = async (id: string): Promise<string> => {
+      try {
+        const res = await axios.get(`/api/categories/${id}`);
+        return res.data?.data?.name || 'Danh mục';
+      } catch (error) {
+        return 'Danh mục';
+      }
+    };
+
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get('/api/products');
+        const list = (res.data?.data as any[]) || [];
+
+        const categoryIds = Array.from(new Set(list.map((p) => p.category_id).filter(Boolean)));
+        const entries = await Promise.all(
+          categoryIds.map(async (id) => [id, await fetchCategoryName(id)])
+        );
+        const categories = Object.fromEntries(entries);
+        if (isMounted) {
+          setCategoryMap(categories);
+        }
+
+        const normalized: Product[] = list.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: categories[p.category_id] || 'Danh mục',
+          price: p.sale_price ?? p.price ?? 0,
+          image: normalizeImageUrl(p.thumbnail?.url) || '🛒',
+          inStock: (p.stock_quantity ?? 0) > 0 && p.status === 'active',
+          storeName: 'ShopeeShop',
+          rating: p.rating ?? 0,
+          stock: p.stock_quantity ?? 0,
+        }));
+
+        if (isMounted) {
+          setProducts(normalized);
+        }
+      } catch (error) {
+        toast.error('Không tải được danh sách sản phẩm');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))]
+
+  const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -76,7 +134,7 @@ export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct 
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        
+
         <div>
           <p className="text-xs sm:text-sm mb-1.5">Danh mục</p>
           <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
@@ -96,13 +154,48 @@ export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct 
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredProducts.map((product) => {
+        {loading && (
+          <Card className="col-span-full">
+            <CardContent className="py-6 text-center text-sm text-gray-500">Đang tải sản phẩm...</CardContent>
+          </Card>
+        )}
+
+        {!loading && filteredProducts.length === 0 && (
+          <Card className="col-span-full">
+            <CardContent className="py-6 text-center text-sm text-gray-500">Chưa có sản phẩm</CardContent>
+          </Card>
+        )}
+
+        {!loading && filteredProducts.map((product) => {
           const quantity = cart[product.id] || 0;
+          const hasImage = !!product.image && (product.image.startsWith('http://') || product.image.startsWith('https://'));
           return (
             <Card key={product.id} className="flex flex-col cursor-pointer hover:shadow-lg transition-shadow">
               <div onClick={() => onSelectProduct(product)}>
                 <CardHeader>
-                  <div className="text-6xl text-center mb-4">{product.image}</div>
+                  <div className="h-40 flex items-center justify-center mb-4 bg-gray-50 rounded">
+                    {hasImage ? (
+                      <img
+                        src={product.image || DEFAULT_IMAGE}
+                        alt={product.name}
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                        onError={(e) => {
+                          const img = e.currentTarget as HTMLImageElement;
+                          if (img.src !== DEFAULT_IMAGE) {
+                            img.src = DEFAULT_IMAGE;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={DEFAULT_IMAGE}
+                        alt="placeholder"
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
                   <CardTitle className="text-base line-clamp-2 mb-2">{product.name}</CardTitle>
                   {product.storeName && (
                     <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
@@ -110,7 +203,7 @@ export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct 
                       <span>{product.storeName}</span>
                     </div>
                   )}
-                  {product.rating && (
+                  {product.rating !== undefined && (
                     <div className="flex items-center gap-1">
                       <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                       <span className="text-xs font-semibold">{product.rating}</span>

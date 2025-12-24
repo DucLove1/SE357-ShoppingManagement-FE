@@ -126,7 +126,27 @@ function AppContent() {
     if (showRegister) {
       return <RegisterPage onSwitchToLogin={() => setShowRegister(false)} />;
     }
-    return <LoginPage onSwitchToRegister={() => setShowRegister(true)} />;
+    return (
+      <LoginPage
+        onSwitchToRegister={() => setShowRegister(true)}
+        onLoginSuccess={(role) => {
+          // Set landing view by role
+          switch (role) {
+            case 'admin':
+              setCurrentView('dashboard');
+              break;
+            case 'seller':
+              setCurrentView('home');
+              break;
+            case 'customer':
+              setCurrentView('home');
+              break;
+            default:
+              setCurrentView('home');
+          }
+        }}
+      />
+    );
   }
 
   const addToCart = (productId: string) => {
@@ -159,7 +179,7 @@ function AppContent() {
   if (user.role === 'admin') {
     const pendingSellerCount = mockUsers.filter(u => u.role === 'seller' && u.status === 'pending').length;
     const adminNotificationCount = 8; // Mock notification count
-    
+
     const renderView = () => {
       switch (currentView) {
         case 'dashboard':
@@ -184,8 +204,8 @@ function AppContent() {
     return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
-          <AppSidebar 
-            currentView={currentView} 
+          <AppSidebar
+            currentView={currentView}
             onNavigate={setCurrentView}
             pendingCount={pendingSellerCount}
             notificationCount={adminNotificationCount}
@@ -263,8 +283,8 @@ function AppContent() {
         <div className="flex min-h-screen w-full bg-gray-50">
           {/* Desktop Sidebar */}
           <div className="hidden md:block">
-            <SellerSidebar 
-              currentView={currentView} 
+            <SellerSidebar
+              currentView={currentView}
               onNavigate={setCurrentView}
               userName={user.name}
               onLogout={logout}
@@ -299,18 +319,16 @@ function AppContent() {
             <div className="grid grid-cols-5 h-16">
               <button
                 onClick={() => setCurrentView('home')}
-                className={`flex flex-col items-center justify-center gap-1 ${
-                  currentView === 'home' ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 ${currentView === 'home' ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 <Home className="h-5 w-5" />
                 <span className="text-[10px]">Tổng quan</span>
               </button>
               <button
                 onClick={() => setCurrentView('orders')}
-                className={`flex flex-col items-center justify-center gap-1 relative ${
-                  currentView === 'orders' ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 relative ${currentView === 'orders' ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 <ShoppingCart className="h-5 w-5" />
                 <span className="text-[10px]">Đơn hàng</span>
@@ -320,18 +338,16 @@ function AppContent() {
               </button>
               <button
                 onClick={() => setCurrentView('analytics')}
-                className={`flex flex-col items-center justify-center gap-1 ${
-                  currentView === 'analytics' ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 ${currentView === 'analytics' ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 <BarChart3 className="h-5 w-5" />
                 <span className="text-[10px]">Thống kê</span>
               </button>
               <button
                 onClick={() => setCurrentView('returns')}
-                className={`flex flex-col items-center justify-center gap-1 relative ${
-                  currentView === 'returns' ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 relative ${currentView === 'returns' ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 <RotateCcw className="h-5 w-5" />
                 <span className="text-[10px]">Trả hàng</span>
@@ -341,9 +357,8 @@ function AppContent() {
               </button>
               <button
                 onClick={() => setCurrentView('payouts')}
-                className={`flex flex-col items-center justify-center gap-1 ${
-                  currentView === 'payouts' ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 ${currentView === 'payouts' ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 <Wallet className="h-5 w-5" />
                 <span className="text-[10px]">Thu nhập</span>
@@ -620,7 +635,7 @@ function AppContent() {
           return <CustomerNotifications />;
         case 'profile':
           return (
-            <CustomerProfile 
+            <CustomerProfile
               onEditProfile={() => setShowEditProfile(true)}
               onViewOrders={() => setCurrentView('orders')}
               onViewReturns={() => setShowReturns(true)}
@@ -648,9 +663,9 @@ function AppContent() {
           <div className="container mx-auto px-3 py-3 sm:px-4 sm:py-4">
             <div className="flex justify-between items-center">
               {selectedProduct ? (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setSelectedProduct(null)}
                   className="-ml-2"
                 >
@@ -721,9 +736,8 @@ function AppContent() {
                 setChatDetail(null);
                 setSelectedProduct(null);
               }}
-              className={`flex flex-col items-center py-2 ${
-                currentView === 'home' ? 'text-blue-600' : 'text-gray-600'
-              }`}
+              className={`flex flex-col items-center py-2 ${currentView === 'home' ? 'text-blue-600' : 'text-gray-600'
+                }`}
             >
               <Home className="h-5 w-5" />
               <span className="text-[10px] mt-0.5">Trang chủ</span>
@@ -733,9 +747,8 @@ function AppContent() {
                 setCurrentView('orders');
                 setChatDetail(null);
               }}
-              className={`flex flex-col items-center py-2 ${
-                currentView === 'orders' ? 'text-blue-600' : 'text-gray-600'
-              }`}
+              className={`flex flex-col items-center py-2 ${currentView === 'orders' ? 'text-blue-600' : 'text-gray-600'
+                }`}
             >
               <Package className="h-5 w-5" />
               <span className="text-[10px] mt-0.5">Đơn hàng</span>
@@ -746,9 +759,8 @@ function AppContent() {
                 setChatDetail(null);
                 setSelectedProduct(null);
               }}
-              className={`flex flex-col items-center py-2 ${
-                currentView === 'reviews' ? 'text-blue-600' : 'text-gray-600'
-              }`}
+              className={`flex flex-col items-center py-2 ${currentView === 'reviews' ? 'text-blue-600' : 'text-gray-600'
+                }`}
             >
               <Star className="h-5 w-5" />
               <span className="text-[10px] mt-0.5">Đánh giá</span>
@@ -759,9 +771,8 @@ function AppContent() {
                 setChatDetail(null);
                 setSelectedProduct(null);
               }}
-              className={`flex flex-col items-center py-2 ${
-                currentView === 'chat' ? 'text-blue-600' : 'text-gray-600'
-              }`}
+              className={`flex flex-col items-center py-2 ${currentView === 'chat' ? 'text-blue-600' : 'text-gray-600'
+                }`}
             >
               <MessageCircle className="h-5 w-5" />
               <span className="text-[10px] mt-0.5">Tin nhắn</span>
@@ -772,9 +783,8 @@ function AppContent() {
                 setChatDetail(null);
                 setSelectedProduct(null);
               }}
-              className={`flex flex-col items-center py-2 ${
-                currentView === 'profile' ? 'text-blue-600' : 'text-gray-600'
-              }`}
+              className={`flex flex-col items-center py-2 ${currentView === 'profile' ? 'text-blue-600' : 'text-gray-600'
+                }`}
             >
               <User className="h-5 w-5" />
               <span className="text-[10px] mt-0.5">Cá nhân</span>

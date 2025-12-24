@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ArrowLeft, ShoppingCart, Star, Heart, Share2, Package, ShieldCheck, Filter } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import axios from 'axios';
+
+const DEFAULT_IMAGE = 'https://via.placeholder.com/600x600?text=No+Image';
 
 interface Product {
   id: string;
@@ -87,6 +90,58 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [starFilter, setStarFilter] = useState<number | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'helpful'>('newest');
+  const [imageError, setImageError] = useState(false);
+  const [displayImage, setDisplayImage] = useState<string>(DEFAULT_IMAGE);
+  const [detail, setDetail] = useState<Partial<Product> | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const normalizeImageUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const base = (import.meta as any).env?.VITE_API_BASE_URL || '';
+    return `${base}${url}`;
+  };
+
+  const view = useMemo(() => (detail ? { ...product, ...detail } : product), [detail, product]);
+
+  const imageUrl = useMemo(() => normalizeImageUrl(view.image), [view.image]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDetail = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`/api/products/${product.id}`);
+        const d = res.data?.data;
+        if (d && isMounted) {
+          const updated: Partial<Product> = {
+            name: d.name ?? product.name,
+            price: (d.sale_price ?? d.price ?? product.price) as number,
+            stock: (d.stock_quantity ?? product.stock) as number,
+            description: d.description ?? product.description,
+            rating: (d.rating ?? product.rating) as number,
+            reviewCount: (d.rating_count ?? product.reviewCount) as number,
+            soldCount: (d.sold_count ?? product.soldCount) as number,
+            image: (d.thumbnail?.url || (Array.isArray(d.images) && d.images[0]?.url) || product.image) as string,
+          };
+          setDetail(updated);
+        }
+      } catch (e) {
+        // keep initial product data
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchDetail();
+    return () => {
+      isMounted = false;
+    };
+  }, [product.id]);
+
+  useEffect(() => {
+    setImageError(false);
+    setDisplayImage(imageUrl || DEFAULT_IMAGE);
+  }, [imageUrl]);
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {
@@ -116,9 +171,8 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
         {[1, 2, 3, 4, 5].map((star) => (
           <span
             key={star}
-            className={`text-lg ${
-              star <= rating ? 'text-yellow-500' : 'text-gray-300'
-            }`}
+            className={`text-lg ${star <= rating ? 'text-yellow-500' : 'text-gray-300'
+              }`}
           >
             ★
           </span>
@@ -162,39 +216,45 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
           <div className="grid md:grid-cols-2 gap-6">
             {/* Image */}
             <div className="flex justify-center items-center bg-gray-50 rounded-lg p-8 sm:p-12">
-              <div className="text-8xl sm:text-9xl">{product.image}</div>
+              <img
+                src={imageError ? DEFAULT_IMAGE : displayImage}
+                alt={product.name}
+                className="max-h-80 sm:max-h-[26rem] object-contain"
+                loading="lazy"
+                onError={() => setImageError(true)}
+              />
             </div>
 
             {/* Details */}
             <div className="space-y-4">
               <div>
                 <Badge variant="secondary" className="mb-2">
-                  {product.category}
+                  {view.category}
                 </Badge>
-                <h2 className="text-xl sm:text-2xl mb-2">{product.name}</h2>
-                
+                <h2 className="text-xl sm:text-2xl mb-2">{view.name}</h2>
+
                 {/* Rating */}
                 <button
                   onClick={() => onViewReviews?.(product.id)}
                   className="flex items-center gap-3 mb-3 hover:opacity-70 transition-opacity"
                 >
-                  {renderStars(product.rating || 4.5)}
+                  {renderStars(view.rating || 4.5)}
                   <span className="text-sm text-gray-600">
-                    {product.rating || 4.5} ({product.reviewCount || 128} đánh giá)
+                    {view.rating || 4.5} ({view.reviewCount || 128} đánh giá)
                   </span>
                   <span className="text-sm text-gray-400">|</span>
                   <span className="text-sm text-gray-600">
-                    Đã bán {product.soldCount || 350}
+                    Đã bán {view.soldCount || 350}
                   </span>
                 </button>
 
                 {/* Price */}
                 <div className="bg-gray-50 p-4 rounded-lg mb-4">
                   <p className="text-3xl sm:text-4xl text-blue-600 mb-1">
-                    {product.price.toLocaleString('vi-VN')} ₫
+                    {view.price.toLocaleString('vi-VN')} ₫
                   </p>
                   <p className="text-sm text-gray-500">
-                    Còn lại: {product.stock} sản phẩm
+                    Còn lại: {view.stock} sản phẩm
                   </p>
                 </div>
               </div>
@@ -211,7 +271,7 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
                   </button>
                   <span className="px-4 py-1.5 border-x">{quantity}</span>
                   <button
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                    onClick={() => setQuantity(Math.min(view.stock, quantity + 1))}
                     className="px-3 py-1.5 hover:bg-gray-100"
                   >
                     +
@@ -359,10 +419,10 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
                   className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-6 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors w-full"
                 >
                   <div className="text-center">
-                    <p className="text-4xl mb-1">{product.rating || 4.5}</p>
-                    {renderStars(product.rating || 4.5)}
+                    <p className="text-4xl mb-1">{view.rating || 4.5}</p>
+                    {renderStars(view.rating || 4.5)}
                     <p className="text-sm text-gray-600 mt-1">
-                      {product.reviewCount || 128} đánh giá
+                      {view.reviewCount || 128} đánh giá
                     </p>
                   </div>
                   <div className="flex-1 space-y-2 w-full">

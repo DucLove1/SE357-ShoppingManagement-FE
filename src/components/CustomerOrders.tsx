@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -13,7 +13,8 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import axios from 'axios';
 
 interface Order {
   id: string;
@@ -26,57 +27,29 @@ interface Order {
   items: { name: string; quantity: number; price: number; image: string }[];
 }
 
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'DH012',
-    date: '2025-11-08',
-    total: 670000,
-    status: 'processing',
-    sellerName: 'Nhân viên bán hàng A',
-    items: [
-      { name: 'Áo thun nam cổ tròn', quantity: 2, price: 199000, image: '👕' },
-      { name: 'Mũ lưỡi trai', quantity: 1, price: 120000, image: '🧢' },
-    ],
-  },
-  {
-    id: '2',
-    orderNumber: 'DH011',
-    date: '2025-11-07',
-    total: 450000,
-    status: 'shipping',
-    sellerName: 'Nhân viên bán hàng A',
-    trackingNumber: 'VN123456789',
-    items: [{ name: 'Quần jean nữ skinny', quantity: 1, price: 450000, image: '👖' }],
-  },
-  {
-    id: '3',
-    orderNumber: 'DH008',
-    date: '2025-11-05',
-    total: 1100000,
-    status: 'delivered',
-    sellerName: 'Nhân viên bán hàng B',
-    items: [{ name: 'Áo khoác hoodie', quantity: 2, price: 550000, image: '🧥' }],
-  },
-  {
-    id: '4',
-    orderNumber: 'DH007',
-    date: '2025-11-03',
-    total: 320000,
-    status: 'completed',
-    sellerName: 'Nhân viên bán hàng A',
-    items: [{ name: 'Túi xách nữ da PU', quantity: 1, price: 320000, image: '👜' }],
-  },
-  {
-    id: '5',
-    orderNumber: 'DH006',
-    date: '2025-11-01',
-    total: 199000,
-    status: 'cancelled',
-    sellerName: 'Nhân viên bán hàng B',
-    items: [{ name: 'Áo thun nam cổ tròn', quantity: 1, price: 199000, image: '👕' }],
-  },
-];
+const mapStatus = (s: string | undefined): OrderStatus => {
+  switch ((s || '').toLowerCase()) {
+    case 'pending':
+      return 'pending';
+    case 'confirmed':
+      return 'confirmed';
+    case 'processing':
+      return 'processing';
+    case 'shipping':
+      return 'shipping';
+    case 'delivered':
+      return 'delivered';
+    case 'completed':
+      return 'completed';
+    case 'refunded':
+      return 'refunded';
+    case 'cancelled':
+    case 'canceled':
+      return 'cancelled';
+    default:
+      return 'pending';
+  }
+};
 
 interface CustomerOrdersProps {
   onViewOrderDetail?: (orderId: string) => void;
@@ -85,12 +58,59 @@ interface CustomerOrdersProps {
 }
 
 export function CustomerOrders({ onViewOrderDetail, onViewTracking, onViewReturns }: CustomerOrdersProps) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isReturnOpen, setIsReturnOpen] = useState(false);
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [returnReason, setReturnReason] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await axios.get('/api/orders/my-orders', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const data = (res.data?.data as any[]) || [];
+        const normalized: Order[] = data.map((o: any) => {
+          const itemsSrc = Array.isArray(o.items) ? o.items : [];
+          const items = itemsSrc.map((it: any) => ({
+            name: it.name || it.product_name || 'Sản phẩm',
+            quantity: Number(it.quantity ?? 1),
+            price: Number(it.price ?? it.unit_price ?? 0),
+            image: '📦',
+          }));
+          const total = Number(
+            o.total ?? o.total_amount ?? items.reduce((s: number, it: any) => s + it.price * it.quantity, 0)
+          );
+          return {
+            id: String(o.id ?? o._id ?? crypto.randomUUID()),
+            orderNumber: o.order_number || o.orderNumber || `ORD-${String(o.id ?? '').slice(-6)}`,
+            date: o.created_at || o.createdAt || new Date().toISOString(),
+            total,
+            status: mapStatus(o.status),
+            sellerName: 'ShopeeShop',
+            trackingNumber: o.tracking_number || o.trackingNumber,
+            items,
+          } as Order;
+        });
+        if (active) setOrders(normalized);
+      } catch (e) {
+        toast.error('Không tải được danh sách đơn hàng');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchOrders();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const getStatusBadge = (status: OrderStatus) => {
     const statusConfig: Record<
@@ -110,8 +130,8 @@ export function CustomerOrders({ onViewOrderDetail, onViewTracking, onViewReturn
   };
 
   const filterOrdersByStatus = (status: OrderStatus | 'all') => {
-    if (status === 'all') return mockOrders;
-    return mockOrders.filter((order) => order.status === status);
+    if (status === 'all') return orders;
+    return orders.filter((order) => order.status === status);
   };
 
   const handleConfirmReceived = (orderId: string) => {
@@ -288,7 +308,17 @@ export function CustomerOrders({ onViewOrderDetail, onViewTracking, onViewReturn
         </div>
 
         <TabsContent value="all" className="space-y-4 mt-4">
-          {filterOrdersByStatus('all').map(renderOrderCard)}
+          {loading && (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-gray-500">Đang tải đơn hàng...</CardContent>
+            </Card>
+          )}
+          {!loading && filterOrdersByStatus('all').length === 0 && (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-gray-500">Bạn chưa có đơn hàng nào</CardContent>
+            </Card>
+          )}
+          {!loading && filterOrdersByStatus('all').map(renderOrderCard)}
         </TabsContent>
         <TabsContent value="processing" className="space-y-4 mt-4">
           {filterOrdersByStatus('processing').map(renderOrderCard)}
@@ -362,9 +392,8 @@ export function CustomerOrders({ onViewOrderDetail, onViewTracking, onViewReturn
                   <button
                     key={star}
                     onClick={() => setReviewData({ ...reviewData, rating: star })}
-                    className={`text-2xl ${
-                      star <= reviewData.rating ? 'text-yellow-500' : 'text-gray-300'
-                    }`}
+                    className={`text-2xl ${star <= reviewData.rating ? 'text-yellow-500' : 'text-gray-300'
+                      }`}
                   >
                     ★
                   </button>

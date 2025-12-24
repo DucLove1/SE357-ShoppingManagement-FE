@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import axios from 'axios';
 
 export type UserRole = 'admin' | 'seller' | 'customer';
 
@@ -11,7 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -51,16 +52,58 @@ const mockUsers: Record<string, { password: string; user: User }> = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = (email: string, password: string): boolean => {
-    const userRecord = mockUsers[email];
-    if (userRecord && userRecord.password === password) {
-      setUser(userRecord.user);
-      return true;
-    }
-    return false;
+  const mapRole = (role: string): UserRole => {
+    if (role === 'admin' || role === 'seller' || role === 'customer') return role;
+    if (role === 'buyer') return 'customer';
+    return 'customer';
   };
 
+  // const login = (email: string, password: string): boolean => {
+  //   const userRecord = mockUsers[email];
+  //   if (userRecord && userRecord.password === password) {
+  //     setUser(userRecord.user);
+  //     return true;
+  //   }
+  //   return false;
+  // };
+
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await axios.post('/api/auth/local/login', {
+        email,
+        password,
+      });
+
+      if (res.status === 200 && res.data?.success && res.data?.data) {
+        const data = res.data.data;
+        const u = data.user;
+        const accessToken = data.access_token as string | undefined;
+
+        if (accessToken) {
+          localStorage.setItem('access_token', accessToken);
+        }
+
+        if (u) {
+          setUser({
+            id: u.id,
+            name: (u.full_name as string) || '',
+            email: u.email,
+            role: mapRole(String(u.role)),
+          });
+        }
+
+        return true;
+      }
+      return false;
+    } catch (err) {
+      return false;
+    }
+  };
+
+
   const logout = () => {
+    localStorage.removeItem('access_token');
     setUser(null);
   };
 

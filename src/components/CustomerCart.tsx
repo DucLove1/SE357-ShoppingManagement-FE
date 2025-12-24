@@ -4,7 +4,7 @@ import { Badge } from './ui/badge';
 import { Plus, Minus, Trash2, ShoppingBag, Store, ShoppingCart, Package, ArrowLeft } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Checkbox } from './ui/checkbox';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useState } from 'react';
 
 interface Product {
