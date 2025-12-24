@@ -213,11 +213,89 @@ function AppContent() {
     );
   }
 
-  const addToCart = (productId: string) => {
-    setCart((prev) => ({
-      ...prev,
-      [productId]: (prev[productId] || 0) + 1,
-    }));
+  const addToCart = async (productId: string, quantity: number = 1) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.error('No access token found');
+      return;
+    }
+
+    try {
+      await axios.post('/api/cart/items',
+        {
+          product_id: productId,
+          quantity: quantity,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Update local state
+      setCart((prev) => ({
+        ...prev,
+        [productId]: (prev[productId] || 0) + quantity,
+      }));
+    } catch (err) {
+      console.error('Failed to add item to cart:', err);
+    }
+  };
+
+  const removeFromCart = async (productId: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.error('No access token found');
+      return;
+    }
+
+    try {
+      await axios.post('/api/cart/items',
+        {
+          product_id: productId,
+          quantity: -1,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Update local state - only remove if quantity reaches 0
+      setCart((prev) => {
+        const newQuantity = (prev[productId] || 0) - 1;
+        if (newQuantity <= 0) {
+          const newCart = { ...prev };
+          delete newCart[productId];
+          return newCart;
+        }
+        return {
+          ...prev,
+          [productId]: newQuantity,
+        };
+      });
+    } catch (err) {
+      console.error('Failed to remove item from cart:', err);
+    }
+  };
+
+  const deleteFromCart = async (productId: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.error('No access token found');
+      return;
+    }
+
+    try {
+      await axios.delete(`/api/cart/items/${productId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Update local state - remove item completely
+      const newCart = { ...cart };
+      delete newCart[productId];
+      setCart(newCart);
+    } catch (err) {
+      console.error('Failed to delete item from cart:', err);
+    }
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
@@ -637,6 +715,7 @@ function AppContent() {
             <CustomerShop
               cart={cart}
               addToCart={addToCart}
+              removeFromCart={removeFromCart}
               updateQuantity={updateQuantity}
               onSelectProduct={(product) => setSelectedProduct(product)}
             />
@@ -650,6 +729,9 @@ function AppContent() {
               clearCart={clearCart}
               onCheckout={() => setShowCheckout(true)}
               onBack={() => setCurrentView('home')}
+              addToCart={addToCart}
+              removeFromCart={removeFromCart}
+              deleteFromCart={deleteFromCart}
             />
           );
         case 'orders':

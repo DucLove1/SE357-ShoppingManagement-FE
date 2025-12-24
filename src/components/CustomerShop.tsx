@@ -23,12 +23,13 @@ interface Product {
 
 interface CartContextType {
   cart: Record<string, number>;
-  addToCart: (productId: string) => void;
+  addToCart: (productId: string, quantity?: number) => Promise<void>;
+  removeFromCart?: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => void;
   onSelectProduct: (product: Product) => void;
 }
 
-export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct }: CartContextType) {
+export function CustomerShop({ cart, addToCart, removeFromCart, updateQuantity, onSelectProduct }: CartContextType) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [products, setProducts] = useState<Product[]>([]);
@@ -225,7 +226,7 @@ export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct 
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => updateQuantity(product.id, quantity - 1)}
+                        onClick={() => removeFromCart && removeFromCart(product.id)}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
@@ -233,7 +234,7 @@ export function CustomerShop({ cart, addToCart, updateQuantity, onSelectProduct 
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => updateQuantity(product.id, quantity + 1)}
+                        onClick={() => addToCart(product.id)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>

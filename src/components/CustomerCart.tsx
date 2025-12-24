@@ -35,6 +35,9 @@ interface CartProps {
   clearCart: () => void;
   onCheckout: () => void;
   onBack?: () => void;
+  addToCart?: (productId: string, quantity: number) => Promise<void>;
+  removeFromCart?: (productId: string) => Promise<void>;
+  deleteFromCart?: (productId: string) => Promise<void>;
 }
 
 interface ShopGroup {
@@ -43,7 +46,7 @@ interface ShopGroup {
   items: Array<{ productId: string; product: Product; quantity: number }>;
 }
 
-export function CustomerCart({ cart, products, updateQuantity, clearCart, onCheckout, onBack }: CartProps) {
+export function CustomerCart({ cart, products, updateQuantity, clearCart, onCheckout, onBack, addToCart, removeFromCart, deleteFromCart }: CartProps) {
   const [selectedShops, setSelectedShops] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
@@ -307,7 +310,7 @@ export function CustomerCart({ cart, products, updateQuantity, clearCart, onChec
                                       variant="ghost"
                                       size="icon"
                                       className="h-7 w-7 sm:h-8 sm:w-8"
-                                      onClick={() => updateQuantity(productId, quantity - 1)}
+                                      onClick={() => removeFromCart && removeFromCart(productId)}
                                     >
                                       <Minus className="h-3 w-3" />
                                     </Button>
@@ -316,7 +319,7 @@ export function CustomerCart({ cart, products, updateQuantity, clearCart, onChec
                                       variant="ghost"
                                       size="icon"
                                       className="h-7 w-7 sm:h-8 sm:w-8"
-                                      onClick={() => updateQuantity(productId, quantity + 1)}
+                                      onClick={() => addToCart && addToCart(productId, 1)}
                                     >
                                       <Plus className="h-3 w-3" />
                                     </Button>
@@ -326,7 +329,7 @@ export function CustomerCart({ cart, products, updateQuantity, clearCart, onChec
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 sm:h-8 sm:w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => updateQuantity(productId, 0)}
+                                    onClick={() => deleteFromCart && deleteFromCart(productId)}
                                   >
                                     <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                   </Button>
