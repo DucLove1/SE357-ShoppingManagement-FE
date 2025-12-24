@@ -10,8 +10,10 @@ import { useState } from 'react';
 interface Product {
   id: string;
   name: string;
+  category?: string;
   price: number;
   image: string;
+  inStock?: boolean;
   sellerId?: string;
   sellerName?: string;
   salePrice?: number;
@@ -33,7 +35,7 @@ interface CartProps {
   products?: Record<string, Product>;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
-  onCheckout: () => void;
+  onCheckout: (selectedItems: Array<{ productId: string; product: Product; quantity: number }>) => void;
   onBack?: () => void;
   addToCart?: (productId: string, quantity: number) => Promise<void>;
   removeFromCart?: (productId: string) => Promise<void>;
@@ -148,7 +150,7 @@ export function CustomerCart({ cart, products, updateQuantity, clearCart, onChec
     setSelectedShops(new Set([sellerId]));
 
     toast.success(`Đang thanh toán ${items.length} sản phẩm từ ${items[0].product.sellerName}`);
-    onCheckout();
+    onCheckout(items);
   };
 
   const handleCheckoutSelected = () => {
@@ -157,7 +159,19 @@ export function CustomerCart({ cart, products, updateQuantity, clearCart, onChec
       return;
     }
     toast.success(`Đang thanh toán ${selectedItems.size} sản phẩm đã chọn`);
-    onCheckout();
+
+    // Build array of selected items
+    const selectedItemsArray: Array<{ productId: string; product: Product; quantity: number }> = [];
+    cartItems.forEach(([productId, quantity]) => {
+      if (selectedItems.has(productId)) {
+        const product = (products && products[productId]) || mockProducts[productId];
+        if (product) {
+          selectedItemsArray.push({ productId, product, quantity });
+        }
+      }
+    });
+
+    onCheckout(selectedItemsArray);
   };
 
   const selectedSubtotal = calculateSelectedTotal();

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -7,13 +8,20 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { MapPin, Tag, CreditCard, Wallet, ChevronRight, CheckCircle2, ArrowLeft, Plus, Store } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface Product {
   id: string;
   name: string;
+  category?: string;
   price: number;
   image: string;
+  inStock?: boolean;
+  storeName?: string;
+  sellerId?: string;
+  sellerName?: string;
+  salePrice?: number;
+  originalPrice?: number;
 }
 
 interface Address {
@@ -36,10 +44,13 @@ interface Voucher {
 interface CustomerCheckoutProps {
   cart: Record<string, number>;
   products: Product[];
+  selectedItems?: Array<{ productId: string; product: Product; quantity: number }>;
   onBack: () => void;
   onCheckoutSuccess: () => void;
   onAddAddress: () => void;
   clearCart: () => void;
+  updateQuantity?: (productId: string, quantity: number) => void;
+  deleteFromCart?: (productId: string) => Promise<void>;
 }
 
 const mockAddresses: Address[] = [
@@ -121,40 +132,46 @@ const mockVouchers: Voucher[] = [
   },
 ];
 
-export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, onAddAddress, clearCart }: CustomerCheckoutProps) {
+export function CustomerCheckout({ cart, products, selectedItems, onBack, onCheckoutSuccess, onAddAddress, clearCart, updateQuantity, deleteFromCart }: CustomerCheckoutProps) {
   const [selectedAddress, setSelectedAddress] = useState<Address>(
     mockAddresses.find((a) => a.isDefault) || mockAddresses[0]
   );
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
+  const [customerNote, setCustomerNote] = useState('');
   const [showAddressDialog, setShowAddressDialog] = useState(false);
   const [showVoucherDialog, setShowVoucherDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
-  const cartItems = Object.entries(cart)
-    .map(([productId, quantity]) => ({
-      product: products.find((p) => p.id === productId)!,
-      quantity,
+  const cartItems = selectedItems
+    ? selectedItems.map(item => ({
+      product: item.product,
+      quantity: item.quantity,
     }))
-    .filter((item) => item.product);
+    : Object.entries(cart)
+      .map(([productId, quantity]) => ({
+        product: products.find((p) => p.id === productId)!,
+        quantity,
+      }))
+      .filter((item) => item.product);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
     0
   );
   const shippingFee = 25000;
-  
+
   const calculateVoucherDiscount = (voucher: Voucher | null) => {
     if (!voucher) return 0;
     if (voucher.discount > 0) return voucher.discount;
     // For percentage vouchers
     const percentDiscount = voucher.code.includes('SALE10') ? subtotal * 0.1 :
-                           voucher.code.includes('FLASH15') ? subtotal * 0.15 :
-                           voucher.code.includes('MEGA20') ? subtotal * 0.2 :
-                           0;
+      voucher.code.includes('FLASH15') ? subtotal * 0.15 :
+        voucher.code.includes('MEGA20') ? subtotal * 0.2 :
+          0;
     return Math.min(percentDiscount, voucher.maxDiscount || Infinity);
   };
-  
+
   const voucherDiscount = calculateVoucherDiscount(selectedVoucher);
   const total = subtotal + shippingFee - voucherDiscount;
 
@@ -170,14 +187,61 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
     .filter((v) => subtotal < v.minOrder)
     .sort((a, b) => a.minOrder - b.minOrder); // Sort by lowest min order first
 
-  const handleCheckout = () => {
-    setShowSuccessDialog(true);
-    setTimeout(() => {
-      setShowSuccessDialog(false);
-      clearCart(); // Clear cart after successful order
-      onCheckoutSuccess();
-      toast.success('Đặt hàng thành công!');
-    }, 2000);
+  const handleCheckout = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      toast.error('Vui lòng đăng nhập để đặt hàng');
+      return;
+    }
+
+    try {
+      // Build order items from cart
+      const orderItems = cartItems.map(item => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      }));
+
+      // Parse address - assuming format: "detail, ward, district, province"
+      // For now, use mock IDs since we don't have the real province/ward IDs
+      const orderData = {
+        items: orderItems,
+        shipping_address: {
+          recipient_name: selectedAddress.name,
+          phone_number: selectedAddress.phone,
+          province_id: '694a5ef4578ea2eb3941e729', // Mock province ID
+          ward_id: '694ac6dc6a2e7fcd094d22e4', // Mock ward ID
+          detail: selectedAddress.address,
+        },
+        payment_method: paymentMethod === 'cash' ? 'cod' : 'online',
+        customer_note: customerNote || undefined,
+      };
+
+      await axios.post('/api/orders', orderData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setShowSuccessDialog(true);
+      setTimeout(async () => {
+        setShowSuccessDialog(false);
+
+        // Remove only the ordered items from cart
+        if (selectedItems && deleteFromCart) {
+          // Remove only selected items using DELETE API
+          for (const item of selectedItems) {
+            await deleteFromCart(item.productId);
+          }
+        } else {
+          // Clear entire cart if no selection
+          clearCart();
+        }
+
+        onCheckoutSuccess();
+        toast.success('Đặt hàng thành công!');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to place order:', err);
+      toast.error('Đặt hàng thất bại. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -186,9 +250,9 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
       <div className="sticky top-0 bg-white border-b z-10">
         <div className="container mx-auto px-3 py-3 sm:px-4 sm:py-4 max-w-2xl">
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onBack}
               className="-ml-2"
             >
@@ -244,8 +308,16 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
             {cartItems.map((item, index) => (
               <div key={item.product.id}>
                 <div className="flex gap-3 py-3">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center text-2xl sm:text-3xl flex-shrink-0 shadow-sm">
-                    {item.product.image}
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0">
+                    <img
+                      src={item.product.image}
+                      alt={item.product.name}
+                      className="w-full h-full object-cover rounded-lg border border-gray-200"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://via.placeholder.com/100?text=No+Image';
+                      }}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold line-clamp-2 mb-1">
@@ -332,18 +404,16 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
           </CardHeader>
           <CardContent>
             <RadioGroup value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
-              <div className={`flex items-center space-x-3 p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${
-                paymentMethod === 'cash' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'
-              }`}>
+              <div className={`flex items-center space-x-3 p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'
+                }`}>
                 <RadioGroupItem value="cash" id="cash" />
                 <Label htmlFor="cash" className="flex-1 cursor-pointer flex items-center gap-2">
                   <Wallet className="h-4 w-4" />
                   <span>Thanh toán khi nhận hàng (COD)</span>
                 </Label>
               </div>
-              <div className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                paymentMethod === 'online' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'
-              }`}>
+              <div className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${paymentMethod === 'online' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'
+                }`}>
                 <RadioGroupItem value="online" id="online" />
                 <Label htmlFor="online" className="flex-1 cursor-pointer flex items-center gap-2">
                   <CreditCard className="h-4 w-4" />
@@ -411,9 +481,9 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
               )}
             </div>
           </div>
-          <Button 
-            size="lg" 
-            onClick={handleCheckout} 
+          <Button
+            size="lg"
+            onClick={handleCheckout}
             className="px-6 sm:px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
           >
             Đặt hàng
@@ -443,9 +513,8 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
             {mockAddresses.map((address) => (
               <Card
                 key={address.id}
-                className={`cursor-pointer ${
-                  selectedAddress.id === address.id ? 'border-blue-600 bg-blue-50' : ''
-                }`}
+                className={`cursor-pointer ${selectedAddress.id === address.id ? 'border-blue-600 bg-blue-50' : ''
+                  }`}
                 onClick={() => {
                   setSelectedAddress(address);
                   setShowAddressDialog(false);
@@ -487,7 +556,7 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Best deal indicator */}
           {applicableVouchers.length > 0 && !selectedVoucher && (
             <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-3 -mt-2">
@@ -507,17 +576,16 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
                 if (code.includes('NEW')) return 'blue';
                 return 'orange';
               };
-              
+
               const color = getVoucherColor(voucher.code);
               const isSelected = selectedVoucher?.id === voucher.id;
               const isBestDeal = index === 0; // First voucher is the best deal
-              
+
               return (
                 <Card
                   key={voucher.id}
-                  className={`cursor-pointer transition-all hover:shadow-md relative ${
-                    isSelected ? `border-${color}-600 bg-${color}-50 shadow-md` : 'hover:border-gray-400'
-                  } ${isBestDeal ? 'border-2 border-orange-400' : ''}`}
+                  className={`cursor-pointer transition-all hover:shadow-md relative ${isSelected ? `border-${color}-600 bg-${color}-50 shadow-md` : 'hover:border-gray-400'
+                    } ${isBestDeal ? 'border-2 border-orange-400' : ''}`}
                   onClick={() => {
                     setSelectedVoucher(voucher);
                     setShowVoucherDialog(false);
@@ -531,54 +599,49 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
                   )}
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-gradient-to-br ${
-                        color === 'purple' ? 'from-purple-500 to-purple-600' :
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-gradient-to-br ${color === 'purple' ? 'from-purple-500 to-purple-600' :
                         color === 'red' ? 'from-red-500 to-red-600' :
-                        color === 'green' ? 'from-green-500 to-green-600' :
-                        color === 'blue' ? 'from-blue-500 to-blue-600' :
-                        'from-orange-500 to-orange-600'
-                      }`}>
+                          color === 'green' ? 'from-green-500 to-green-600' :
+                            color === 'blue' ? 'from-blue-500 to-blue-600' :
+                              'from-orange-500 to-orange-600'
+                        }`}>
                         <Tag className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-1">
-                          <p className={`font-bold text-sm ${
-                            color === 'purple' ? 'text-purple-700' :
+                          <p className={`font-bold text-sm ${color === 'purple' ? 'text-purple-700' :
                             color === 'red' ? 'text-red-700' :
-                            color === 'green' ? 'text-green-700' :
-                            color === 'blue' ? 'text-blue-700' :
-                            'text-orange-700'
-                          }`}>{voucher.code}</p>
+                              color === 'green' ? 'text-green-700' :
+                                color === 'blue' ? 'text-blue-700' :
+                                  'text-orange-700'
+                            }`}>{voucher.code}</p>
                           {isSelected && (
-                            <CheckCircle2 className={`h-5 w-5 flex-shrink-0 ${
-                              color === 'purple' ? 'text-purple-600' :
+                            <CheckCircle2 className={`h-5 w-5 flex-shrink-0 ${color === 'purple' ? 'text-purple-600' :
                               color === 'red' ? 'text-red-600' :
-                              color === 'green' ? 'text-green-600' :
-                              color === 'blue' ? 'text-blue-600' :
-                              'text-orange-600'
-                            }`} />
+                                color === 'green' ? 'text-green-600' :
+                                  color === 'blue' ? 'text-blue-600' :
+                                    'text-orange-600'
+                              }`} />
                           )}
                         </div>
                         <p className="text-xs text-gray-600 mb-2">{voucher.description}</p>
                         {voucher.discount > 0 && (
-                          <Badge variant="outline" className={`text-xs ${
-                            color === 'purple' ? 'border-purple-300 bg-purple-100 text-purple-700' :
+                          <Badge variant="outline" className={`text-xs ${color === 'purple' ? 'border-purple-300 bg-purple-100 text-purple-700' :
                             color === 'red' ? 'border-red-300 bg-red-100 text-red-700' :
-                            color === 'green' ? 'border-green-300 bg-green-100 text-green-700' :
-                            color === 'blue' ? 'border-blue-300 bg-blue-100 text-blue-700' :
-                            'border-orange-300 bg-orange-100 text-orange-700'
-                          }`}>
+                              color === 'green' ? 'border-green-300 bg-green-100 text-green-700' :
+                                color === 'blue' ? 'border-blue-300 bg-blue-100 text-blue-700' :
+                                  'border-orange-300 bg-orange-100 text-orange-700'
+                            }`}>
                             Giảm {voucher.discount.toLocaleString('vi-VN')}₫
                           </Badge>
                         )}
                         {voucher.maxDiscount && (
-                          <Badge variant="outline" className={`text-xs ml-1 ${
-                            color === 'purple' ? 'border-purple-300 bg-purple-100 text-purple-700' :
+                          <Badge variant="outline" className={`text-xs ml-1 ${color === 'purple' ? 'border-purple-300 bg-purple-100 text-purple-700' :
                             color === 'red' ? 'border-red-300 bg-red-100 text-red-700' :
-                            color === 'green' ? 'border-green-300 bg-green-100 text-green-700' :
-                            color === 'blue' ? 'border-blue-300 bg-blue-100 text-blue-700' :
-                            'border-orange-300 bg-orange-100 text-orange-700'
-                          }`}>
+                              color === 'green' ? 'border-green-300 bg-green-100 text-green-700' :
+                                color === 'blue' ? 'border-blue-300 bg-blue-100 text-blue-700' :
+                                  'border-orange-300 bg-orange-100 text-orange-700'
+                            }`}>
                             Tối đa {voucher.maxDiscount.toLocaleString('vi-VN')}₫
                           </Badge>
                         )}
@@ -601,7 +664,7 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
                 Bỏ chọn voucher
               </Button>
             )}
-            
+
             {/* Unavailable Vouchers */}
             {unavailableVouchers.length > 0 && (
               <>
@@ -615,10 +678,10 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
                     if (code.includes('NEW')) return 'blue';
                     return 'orange';
                   };
-                  
+
                   const color = getVoucherColor(voucher.code);
                   const needMore = voucher.minOrder - subtotal;
-                  
+
                   return (
                     <Card
                       key={voucher.id}
@@ -626,13 +689,12 @@ export function CustomerCheckout({ cart, products, onBack, onCheckoutSuccess, on
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-gradient-to-br ${
-                            color === 'purple' ? 'from-purple-500 to-purple-600' :
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-gradient-to-br ${color === 'purple' ? 'from-purple-500 to-purple-600' :
                             color === 'red' ? 'from-red-500 to-red-600' :
-                            color === 'green' ? 'from-green-500 to-green-600' :
-                            color === 'blue' ? 'from-blue-500 to-blue-600' :
-                            'from-orange-500 to-orange-600'
-                          } opacity-50`}>
+                              color === 'green' ? 'from-green-500 to-green-600' :
+                                color === 'blue' ? 'from-blue-500 to-blue-600' :
+                                  'from-orange-500 to-orange-600'
+                            } opacity-50`}>
                             <Tag className="h-6 w-6 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">

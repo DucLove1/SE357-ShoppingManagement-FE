@@ -91,6 +91,7 @@ function AppContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutItems, setCheckoutItems] = useState<Array<{ productId: string; product: any; quantity: number }>>([]);
   const [showAddressMap, setShowAddressMap] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -121,9 +122,21 @@ function AppContent() {
   }>({
     name: user?.name || 'User',
     email: user?.email || 'customer@example.com',
-    phone: '0901234567',
-    avatar: undefined,
+    phone: user?.phone || '0901234567',
+    avatar: user?.avatar || undefined,
   });
+
+  // Update userProfile when user data changes
+  useEffect(() => {
+    if (user) {
+      setUserProfile({
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '0901234567',
+        avatar: user.avatar,
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user || user.role !== 'customer') return;
@@ -684,6 +697,7 @@ function AppContent() {
           <CustomerCheckout
             cart={cart}
             products={mockProducts}
+            selectedItems={checkoutItems}
             onBack={() => setShowCheckout(false)}
             onCheckoutSuccess={() => {
               setShowCheckout(false);
@@ -691,6 +705,8 @@ function AppContent() {
             }}
             onAddAddress={() => setShowAddressMap(true)}
             clearCart={clearCart}
+            updateQuantity={updateQuantity}
+            deleteFromCart={deleteFromCart}
           />
         </div>
       );
@@ -727,7 +743,10 @@ function AppContent() {
               products={cartProducts}
               updateQuantity={updateQuantity}
               clearCart={clearCart}
-              onCheckout={() => setShowCheckout(true)}
+              onCheckout={(items) => {
+                setCheckoutItems(items);
+                setShowCheckout(true);
+              }}
               onBack={() => setCurrentView('home')}
               addToCart={addToCart}
               removeFromCart={removeFromCart}

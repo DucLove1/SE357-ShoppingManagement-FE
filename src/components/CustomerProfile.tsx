@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { User, Mail, Phone, MapPin, Edit2, Lock, Package, RotateCcw, Star, MessageCircle, Bell, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface ProfileData {
   name: string;

@@ -8,6 +8,11 @@ interface User {
   name: string;
   email: string;
   role: UserRole;
+  phone?: string;
+  avatar?: string;
+  address?: string;
+  dateOfBirth?: string;
+  gender?: string;
 }
 
 interface AuthContextType {
@@ -50,7 +55,18 @@ const mockUsers: Record<string, { password: string; user: User }> = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    // Try to restore user data from localStorage on init
+    const savedUserData = localStorage.getItem('user_data');
+    if (savedUserData) {
+      try {
+        return JSON.parse(savedUserData);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
   const mapRole = (role: string): UserRole => {
     if (role === 'admin' || role === 'seller' || role === 'customer') return role;
@@ -85,12 +101,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (u) {
-          setUser({
+          const userData = {
             id: u.id,
             name: (u.full_name as string) || '',
             email: u.email,
             role: mapRole(String(u.role)),
-          });
+            phone: u.phone_number || '',
+            avatar: u.avatar || '',
+            address: u.address || '',
+            dateOfBirth: u.date_of_birth || '',
+            gender: u.gender || '',
+          };
+
+          // Save full user data to localStorage
+          localStorage.setItem('user_data', JSON.stringify(userData));
+
+          setUser(userData);
         }
 
         return true;
@@ -104,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('user_data');
     setUser(null);
   };
 
