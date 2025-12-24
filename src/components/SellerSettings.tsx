@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -8,29 +8,32 @@ import { Switch } from './ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { User, Store, CreditCard, Bell, Shield, Upload, Camera } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import { useAuth } from '../contexts/AuthContext';
 
 export function SellerSettings() {
+  const { user } = useAuth();
+
   const [profile, setProfile] = useState({
-    name: 'Nguyễn Văn Seller',
-    email: 'seller@fashionstore.com',
-    phone: '0901234567',
-    avatar: undefined as string | undefined,
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    avatar: (user?.avatar as string | undefined) || undefined,
   });
 
   const [store, setStore] = useState({
-    name: 'Fashion Store A',
-    description: 'Chuyên cung cấp thời trang nam nữ chất lượng cao với giá cả phải chăng',
-    address: '123 Nguyễn Huệ, Q.1, TP.HCM',
-    phone: '0281234567',
-    email: 'contact@fashionstore.com',
+    name: '',
+    description: '',
+    address: '',
+    phone: '',
+    email: '',
     logo: undefined as string | undefined,
   });
 
   const [bank, setBank] = useState({
-    bankName: 'Ngân hàng Vietcombank',
-    accountNumber: '0123456789',
-    accountName: 'NGUYEN VAN SELLER',
-    branch: 'Chi nhánh Sài Gòn',
+    bankName: '',
+    accountNumber: '',
+    accountName: '',
+    branch: '',
   });
 
   const [notifications, setNotifications] = useState({
@@ -41,6 +44,17 @@ export function SellerSettings() {
     paymentUpdate: false,
     systemUpdate: false,
   });
+
+  useEffect(() => {
+    if (!user) return;
+    setProfile((prev) => ({
+      ...prev,
+      name: user.name || prev.name,
+      email: user.email || prev.email,
+      phone: user.phone || prev.phone,
+      avatar: user.avatar || prev.avatar,
+    }));
+  }, [user]);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

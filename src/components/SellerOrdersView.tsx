@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -8,7 +8,8 @@ import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Search, Eye, Check, X, Truck, Package as PackageIcon, Users, Filter } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import axios from 'axios';
 import { OrderStatus } from '../types';
 import { SellerOrdersByCustomer } from './SellerOrdersByCustomer';
 
@@ -19,74 +20,96 @@ interface Order {
   date: string;
   total: number;
   status: OrderStatus;
-  items: { name: string; quantity: number; price: number }[];
+  paymentStatus?: string;
+  paymentMethod?: string;
+  itemCount?: number;
+  items?: { name: string; quantity: number; price: number }[];
 }
 
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'DH001',
-    customerName: 'Nguyễn Văn A',
-    date: '2025-11-08',
-    total: 1340000,
-    status: 'delivered',
-    items: [
-      { name: 'Áo thun nam cổ tròn', quantity: 2, price: 199000 },
-      { name: 'Túi xách nữ da PU', quantity: 3, price: 320000 },
-    ],
-  },
-  {
-    id: '2',
-    orderNumber: 'DH002',
-    customerName: 'Trần Thị B',
-    date: '2025-11-07',
-    total: 450000,
-    status: 'shipping',
-    items: [{ name: 'Quần jean nữ skinny', quantity: 1, price: 450000 }],
-  },
-  {
-    id: '3',
-    orderNumber: 'DH003',
-    customerName: 'Lê Văn C',
-    date: '2025-11-06',
-    total: 890000,
-    status: 'processing',
-    items: [{ name: 'Giày thể thao nam', quantity: 1, price: 890000 }],
-  },
-  {
-    id: '4',
-    orderNumber: 'DH004',
-    customerName: 'Phạm Thị D',
-    date: '2025-11-05',
-    total: 1100000,
-    status: 'pending',
-    items: [{ name: 'Áo khoác hoodie', quantity: 2, price: 550000 }],
-  },
-  {
-    id: '5',
-    orderNumber: 'DH005',
-    customerName: 'Hoàng Văn E',
-    date: '2025-11-04',
-    total: 640000,
-    status: 'cancelled',
-    items: [{ name: 'Túi xách nữ da PU', quantity: 2, price: 320000 }],
-  },
-  {
-    id: '6',
-    orderNumber: 'DH006',
-    customerName: 'Nguyễn Thị F',
-    date: '2025-11-03',
-    total: 450000,
-    status: 'completed',
-    items: [{ name: 'Quần jean nữ skinny', quantity: 1, price: 450000 }],
-  },
-];
+const mapStatus = (s: string | undefined): OrderStatus => {
+  switch ((s || '').toLowerCase()) {
+    case 'pending': return 'pending';
+    case 'confirmed': return 'confirmed';
+    case 'processing': return 'processing';
+    case 'shipping': case 'shipped': return 'shipping';
+    case 'delivered': return 'delivered';
+    case 'completed': return 'completed';
+    case 'refunded': return 'refunded';
+    case 'cancelled': case 'canceled': return 'cancelled';
+    default: return 'pending';
+  }
+};
 
 export function SellerOrdersView() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchOrders = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await axios.get('/api/orders/seller', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const list = res.data?.data?.orders || [];
+        const normalized: Order[] = list.map((o: any) => ({
+          id: String(o.id),
+          orderNumber: o.order_number,
+          customerName: 'Khách hàng',
+          date: o.created_at,
+          total: Number(o.total ?? 0),
+          status: mapStatus(o.status),
+          paymentStatus: o.payment_status,
+          paymentMethod: o.payment_method,
+          itemCount: o.item_count,
+          items: [],
+        }));
+        if (active) setOrders(normalized);
+      } catch (e: any) {
+        toast.error(e.response?.data?.message || 'Không thể tải đơn hàng người bán');
+        console.error(e);
+      }
+    };
+    fetchOrders();
+    return () => { active = false; };
+  }, []);
+
+  const fetchOrderDetail = async (orderId: string) => {
+    setDetailLoading(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await axios.get(`/api/orders/${orderId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const o = res.data?.data || {};
+      const itemsSrc = Array.isArray(o.items) ? o.items : [];
+      const items = itemsSrc.map((it: any) => ({
+        name: it.product_name || it.name || 'Sản phẩm',
+        quantity: Number(it.quantity ?? 1),
+        price: Number(it.price ?? it.unit_price ?? 0),
+      }));
+
+      setSelectedOrder(prev => prev ? {
+        ...prev,
+        customerName: o.customer_name || prev.customerName,
+        total: Number(o.total ?? prev.total ?? 0),
+        status: mapStatus(o.status || prev.status),
+        paymentStatus: o.payment_status || prev.paymentStatus,
+        paymentMethod: o.payment_method || prev.paymentMethod,
+        itemCount: o.item_count ?? prev.itemCount,
+        items,
+      } : prev);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Không thể tải chi tiết đơn hàng');
+      console.error(e);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const filteredOrders = (status: OrderStatus | 'all') => {
     const byStatus = status === 'all' ? orders : orders.filter((o) => o.status === status);
@@ -117,6 +140,7 @@ export function SellerOrdersView() {
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
     setIsDetailOpen(true);
+    fetchOrderDetail(order.id);
   };
 
   const handleUpdateStatus = (orderId: string, newStatus: OrderStatus) => {
@@ -286,14 +310,26 @@ export function SellerOrdersView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedOrder.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{item.price.toLocaleString('vi-VN')} ₫</TableCell>
-                          <TableCell>{(item.quantity * item.price).toLocaleString('vi-VN')} ₫</TableCell>
+                      {detailLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-6">Đang tải chi tiết...</TableCell>
                         </TableRow>
-                      ))}
+                      ) : selectedOrder.items && selectedOrder.items.length > 0 ? (
+                        selectedOrder.items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.name}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>{item.price.toLocaleString('vi-VN')} ₫</TableCell>
+                            <TableCell>{(item.quantity * item.price).toLocaleString('vi-VN')} ₫</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-6">
+                            {selectedOrder.itemCount ? `${selectedOrder.itemCount} sản phẩm` : 'Không có dữ liệu sản phẩm'}
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
