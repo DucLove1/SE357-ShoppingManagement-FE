@@ -17,6 +17,7 @@ interface Product {
   category: string;
   stock: number;
   image: string;
+  categoryId?: string;
   description?: string;
   rating?: number;
   reviewCount?: number;
@@ -115,6 +116,7 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
         const d = res.data?.data;
         if (d && isMounted) {
           const updated: Partial<Product> = {
+            id: d.id ?? product.id,
             name: d.name ?? product.name,
             price: (d.sale_price ?? d.price ?? product.price) as number,
             stock: (d.stock_quantity ?? product.stock) as number,
@@ -122,6 +124,8 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
             rating: (d.rating ?? product.rating) as number,
             reviewCount: (d.rating_count ?? product.reviewCount) as number,
             soldCount: (d.sold_count ?? product.soldCount) as number,
+            category: product.category,
+            categoryId: d.category_id ?? product.categoryId,
             image: (d.thumbnail?.url || (Array.isArray(d.images) && d.images[0]?.url) || product.image) as string,
           };
           setDetail(updated);
@@ -200,6 +204,11 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
       }
     });
 
+  const ratingValue = view.rating ?? 0;
+  const displayRating = ratingValue.toFixed(1);
+  const reviewCount = view.reviewCount ?? 0;
+  const soldCount = view.soldCount ?? 0;
+
   return (
     <div className="space-y-3 sm:space-y-6">
       {/* Header */}
@@ -218,7 +227,7 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
             <div className="flex justify-center items-center bg-gray-50 rounded-lg p-8 sm:p-12">
               <img
                 src={imageError ? DEFAULT_IMAGE : displayImage}
-                alt={product.name}
+                alt={view.name}
                 className="max-h-80 sm:max-h-[26rem] object-contain"
                 loading="lazy"
                 onError={() => setImageError(true)}
@@ -238,13 +247,13 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
                   onClick={() => onViewReviews?.(product.id)}
                   className="flex items-center gap-3 mb-3 hover:opacity-70 transition-opacity"
                 >
-                  {renderStars(view.rating || 4.5)}
+                  {renderStars(ratingValue)}
                   <span className="text-sm text-gray-600">
-                    {view.rating || 4.5} ({view.reviewCount || 128} đánh giá)
+                    {displayRating} ({reviewCount} đánh giá)
                   </span>
                   <span className="text-sm text-gray-400">|</span>
                   <span className="text-sm text-gray-600">
-                    Đã bán {view.soldCount || 350}
+                    Đã bán {soldCount}
                   </span>
                 </button>
 
@@ -337,7 +346,7 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
             Thông số
           </TabsTrigger>
           <TabsTrigger value="reviews" className="text-xs sm:text-sm">
-            Đánh giá ({product.reviewCount || 128})
+            Đánh giá ({reviewCount})
           </TabsTrigger>
         </TabsList>
 
@@ -346,7 +355,7 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
             <CardContent className="p-4 sm:p-6">
               <h3 className="mb-3">Mô tả sản phẩm</h3>
               <p className="text-gray-700 leading-relaxed">
-                {product.description ||
+                {view.description ||
                   'Sản phẩm chất lượng cao, được làm từ những nguyên liệu tốt nhất. Thiết kế hiện đại, phù hợp với mọi phong cách. Đảm bảo độ bền và tính thẩm mỹ cao. Sản phẩm đã được kiểm định chất lượng và đạt các tiêu chuẩn quốc tế.'}
               </p>
               <div className="mt-4 space-y-2">
@@ -366,8 +375,8 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
             <CardContent className="p-4 sm:p-6">
               <h3 className="mb-3">Thông số kỹ thuật</h3>
               <div className="space-y-3">
-                {product.specifications ? (
-                  Object.entries(product.specifications).map(([key, value]) => (
+                {view.specifications ? (
+                  Object.entries(view.specifications).map(([key, value]) => (
                     <div key={key} className="flex py-2 border-b last:border-0">
                       <span className="text-gray-600 w-1/3">{key}</span>
                       <span className="font-medium w-2/3">{value}</span>
@@ -377,11 +386,11 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
                   <>
                     <div className="flex py-2 border-b">
                       <span className="text-gray-600 w-1/3">Danh mục</span>
-                      <span className="font-medium w-2/3">{product.category}</span>
+                      <span className="font-medium w-2/3">{view.category}</span>
                     </div>
                     <div className="flex py-2 border-b">
                       <span className="text-gray-600 w-1/3">Mã sản phẩm</span>
-                      <span className="font-medium w-2/3">{product.id}</span>
+                      <span className="font-medium w-2/3">{view.id}</span>
                     </div>
                     <div className="flex py-2 border-b">
                       <span className="text-gray-600 w-1/3">Tình trạng</span>
@@ -389,7 +398,7 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
                     </div>
                     <div className="flex py-2">
                       <span className="text-gray-600 w-1/3">Kho</span>
-                      <span className="font-medium w-2/3">{product.stock} sản phẩm</span>
+                      <span className="font-medium w-2/3">{view.stock} sản phẩm</span>
                     </div>
                   </>
                 )}
@@ -419,10 +428,10 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
                   className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-6 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors w-full"
                 >
                   <div className="text-center">
-                    <p className="text-4xl mb-1">{view.rating || 4.5}</p>
-                    {renderStars(view.rating || 4.5)}
+                    <p className="text-4xl mb-1">{displayRating}</p>
+                    {renderStars(ratingValue)}
                     <p className="text-sm text-gray-600 mt-1">
-                      {view.reviewCount || 128} đánh giá
+                      {reviewCount} đánh giá
                     </p>
                   </div>
                   <div className="flex-1 space-y-2 w-full">
