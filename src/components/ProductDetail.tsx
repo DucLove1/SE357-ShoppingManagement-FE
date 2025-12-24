@@ -18,6 +18,8 @@ interface Product {
   stock: number;
   image: string;
   categoryId?: string;
+  originalPrice?: number;
+  salePrice?: number;
   description?: string;
   rating?: number;
   reviewCount?: number;
@@ -115,10 +117,14 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
         const res = await axios.get(`/api/products/${product.id}`);
         const d = res.data?.data;
         if (d && isMounted) {
+          const basePrice = (d.price ?? product.originalPrice ?? product.price) as number;
+          const salePrice = (d.sale_price ?? basePrice) as number;
           const updated: Partial<Product> = {
             id: d.id ?? product.id,
             name: d.name ?? product.name,
-            price: (d.sale_price ?? d.price ?? product.price) as number,
+            price: salePrice,
+            salePrice,
+            originalPrice: basePrice,
             stock: (d.stock_quantity ?? product.stock) as number,
             description: d.description ?? product.description,
             rating: (d.rating ?? product.rating) as number,
@@ -259,9 +265,16 @@ export function ProductDetail({ product, onBack, addToCart, onViewReviews }: Pro
 
                 {/* Price */}
                 <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <p className="text-3xl sm:text-4xl text-blue-600 mb-1">
-                    {view.price.toLocaleString('vi-VN')} ₫
-                  </p>
+                  <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                    <p className="text-3xl sm:text-4xl text-blue-600">
+                      {view.price.toLocaleString('vi-VN')} ₫
+                    </p>
+                    {view.originalPrice && view.originalPrice > view.price && (
+                      <p className="text-sm sm:text-base text-gray-500 line-through">
+                        {view.originalPrice.toLocaleString('vi-VN')} ₫
+                      </p>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500">
                     Còn lại: {view.stock} sản phẩm
                   </p>
