@@ -1,8 +1,10 @@
-  ## Running the code
+# SE357-ShoppingManagement-FE
 
-  Please ensure that you have the [backend](https://github.com/DucLove1/SE357-ShoppingManagement-BE) running in port 8080.
+## Running the code
 
-  First, run `npm i` to install the dependencies.
+Please ensure that you have the [backend](https://github.com/DucLove1/SE357-ShoppingManagement-BE) running in port 8080.
 
-  Then run `npm run dev` to start the development server.
-  
+First, run `npm i` to install the dependencies.
+
+Then run `npm run dev` to start the development server.
+
