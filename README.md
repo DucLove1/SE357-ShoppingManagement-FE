@@ -9,7 +9,7 @@
 
 ## Members
 <a name="thanhvien"></a>
-| STT    | ID          | Full name              | Github                                               | Email                   |
+| No.    | ID          | Full name              | Github                                               | Email                   |
 | ------ |:-------------:|:----------------------:|:----------------------------------------------------:|:-----------------------:|
 | 1      | 23520305      | Lữ Nguyễn Duy Đức       |[DucLove1](https://github.com/DucLove1)   |23520305@gm.uit.edu.vn   |
 | 2      | 23520905      | Võ Hồng Lương       |[luong-vh](https://github.com/luong-vh)           |23520905@gm.uit.edu.vn   |
